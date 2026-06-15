@@ -61,16 +61,28 @@
       cursor: grab;
       touch-action: none;
       user-select: none;
+      -webkit-user-select: none;
+      -webkit-user-drag: none;
       will-change: transform;
+      outline: none !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    .sprite.dragging,
+    .sprite.selected,
+    .sprite:hover,
+    .sprite:active,
+    .sprite:focus,
+    .sprite:focus-visible {
+      outline: none !important;
+      outline-offset: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
     }
 
     .sprite.dragging {
       cursor: grabbing;
-    }
-
-    .sprite.selected {
-      outline: 1px solid #fff;
-      outline-offset: 7px;
     }
 
     .ui {
@@ -298,9 +310,7 @@
       }
 
       function selectSprite(sprite) {
-        if (selected && selected.el) selected.el.classList.remove("selected");
         selected = sprite;
-        if (selected && selected.el) selected.el.classList.add("selected");
       }
 
       function updateSpriteMetrics(sprite) {
@@ -459,7 +469,6 @@
           selected = sprites[sprites.length - 1] || null;
         }
 
-        if (selected) selected.el.classList.add("selected");
         updateHint();
       }
 
