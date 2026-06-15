@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <title>PNG Shaker</title>
+  <title>PNG GIF Shaker</title>
 
   <!-- Шрифт грузится из Google Fonts. Если нужен полностью офлайн-вариант, можно заменить на локальный font-face. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -219,12 +219,12 @@
   </style>
 </head>
 <body>
-  <main id="stage" aria-label="PNG play field"></main>
+  <main id="stage" aria-label="PNG GIF play field"></main>
 
   <div class="ui">
     <div class="panel">
-      <label class="fileButton" for="fileInput">PNG</label>
-      <input id="fileInput" type="file" accept="image/png,.png" multiple />
+      <label class="fileButton" for="fileInput">PNG/GIF</label>
+      <input id="fileInput" type="file" accept="image/png,image/gif,.png,.gif" multiple />
 
       <button id="motionButton" type="button">MOTION</button>
       <button id="resetButton" type="button">RESET</button>
@@ -243,13 +243,13 @@
       </div>
 
       <div id="status" class="status">
-        LOAD PNG / TOUCH DRAG / MOTION ON IPHONE
+        LOAD PNG/GIF / TOUCH DRAG / MOTION ON IPHONE
       </div>
     </div>
   </div>
 
   <div id="hint" class="hint">
-    LOAD PNG<br>
+    LOAD PNG/GIF<br>
     GRAVITY 0 = NO FALL
   </div>
 
@@ -277,13 +277,14 @@
       let power = Number(powerRange.value);
       let gravity = Number(gravityRange.value);
 
-      // Спокойная физика: меньше отскок, меньше вращение, больше гашение энергии.
-      const collisionRestitution = 0.34;
-      const wallRestitutionX = 0.38;
-      const wallRestitutionY = 0.30;
-      const airDamping = 0.972;
-      const rotationDamping = 0.94;
-      const collisionDamping = 0.965;
+      // V5: спокойная физика. Главное изменение — почти полностью убрали бесконечную раскрутку.
+      const collisionRestitution = 0.18;
+      const wallRestitutionX = 0.24;
+      const wallRestitutionY = 0.18;
+      const airDamping = 0.966;
+      const rotationDamping = 0.78;
+      const collisionDamping = 0.94;
+      const maxSpin = 0.22;
 
       const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
       const rnd = (min, max) => min + Math.random() * (max - min);
@@ -310,8 +311,8 @@
         sprite.w = w;
         sprite.h = h;
 
-        // Более компактный круглый коллайдер, чтобы PNG не отскакивали слишком рано.
-        sprite.r = Math.max(18, Math.max(w, h) * 0.38);
+        // Компактный круглый коллайдер, чтобы прозрачные края PNG/GIF не сталкивались слишком рано.
+        sprite.r = Math.max(18, Math.max(w, h) * 0.36);
         sprite.mass = Math.max(1, sprite.r * sprite.r);
       }
 
@@ -335,7 +336,7 @@
           `translate3d(${sprite.x}px, ${sprite.y}px, 0) rotate(${sprite.rot}deg)`;
       }
 
-      function addSprite(src, name = "PNG") {
+      function addSprite(src, name = "MEDIA") {
         const img = document.createElement("img");
         img.className = "sprite";
         img.src = src;
@@ -347,14 +348,14 @@
           el: img,
           x: rnd(24, Math.max(25, window.innerWidth - 180)),
           y: rnd(120, Math.max(121, window.innerHeight - 230)),
-          vx: rnd(-0.55, 0.55),
-          vy: rnd(-0.55, 0.55),
-          rot: rnd(-4, 4),
-          vr: rnd(-0.035, 0.035),
+          vx: rnd(-0.45, 0.45),
+          vy: rnd(-0.45, 0.45),
+          rot: rnd(-2, 2),
+          vr: rnd(-0.015, 0.015),
           w: 140,
           h: 140,
-          r: 54,
-          mass: 2916,
+          r: 50,
+          mass: 2500,
           dragging: false,
           pointerId: null,
           dragOffsetX: 0,
@@ -402,9 +403,11 @@
           const nextX = event.clientX - sprite.dragOffsetX;
           const nextY = event.clientY - sprite.dragOffsetY;
 
-          sprite.vx = (event.clientX - sprite.lastDragX) / dt * 12;
-          sprite.vy = (event.clientY - sprite.lastDragY) / dt * 12;
-          sprite.vr = clamp(sprite.vx * .008, -0.35, 0.35);
+          sprite.vx = (event.clientX - sprite.lastDragX) / dt * 10;
+          sprite.vy = (event.clientY - sprite.lastDragY) / dt * 10;
+
+          // От перетаскивания только очень лёгкий поворот.
+          sprite.vr = clamp(sprite.vx * .003, -0.08, 0.08);
 
           sprite.x = nextX;
           sprite.y = nextY;
@@ -463,22 +466,26 @@
       fileInput.addEventListener("change", () => {
         const files = [...fileInput.files];
 
-        const pngs = files.filter(file =>
-          file.type === "image/png" || file.name.toLowerCase().endsWith(".png")
-        );
+        const supported = files.filter(file => {
+          const name = file.name.toLowerCase();
+          return file.type === "image/png" ||
+                 file.type === "image/gif" ||
+                 name.endsWith(".png") ||
+                 name.endsWith(".gif");
+        });
 
-        if (!pngs.length) {
-          setStatus("PNG ONLY");
+        if (!supported.length) {
+          setStatus("PNG/GIF ONLY");
           fileInput.value = "";
           return;
         }
 
-        for (const file of pngs) {
+        for (const file of supported) {
           const url = URL.createObjectURL(file);
           addSprite(url, file.name);
         }
 
-        setStatus(`PNG LOADED: ${pngs.length}`);
+        setStatus(`LOADED: ${supported.length}`);
         fileInput.value = "";
       });
 
@@ -528,25 +535,28 @@
         const dz = zed - lastMotion.z;
         const jerk = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-        // Наклон iPhone тянет картинки мягче, чем в v3.
+        // Наклон iPhone тянет картинки мягко.
         for (const sprite of sprites) {
           if (sprite.dragging) continue;
 
-          sprite.vx += clamp(-x * 0.014 * power, -0.12, 0.12);
-          sprite.vy += clamp(y * 0.014 * power, -0.12, 0.12);
+          sprite.vx += clamp(-x * 0.012 * power, -0.10, 0.10);
+          sprite.vy += clamp(y * 0.012 * power, -0.10, 0.10);
         }
 
-        // Резкая встряска осталась, но вращение и импульс мягче.
-        if (jerk > 10.5 && now - lastShakeAt > 170) {
+        // Встряска. Импульс есть, но вращение почти не добавляется.
+        if (jerk > 10.8 && now - lastShakeAt > 190) {
           lastShakeAt = now;
-          const impulse = clamp((jerk - 8) * 0.55 * power, 2, 11);
+          const impulse = clamp((jerk - 8) * 0.48 * power, 1.8, 9);
 
           for (const sprite of sprites) {
             if (sprite.dragging) continue;
 
-            sprite.vx += rnd(-impulse, impulse) + dx * 0.32 * power;
-            sprite.vy += rnd(-impulse, impulse) - dy * 0.32 * power;
-            sprite.vr += rnd(-0.45, 0.45) * power;
+            sprite.vx += rnd(-impulse, impulse) + dx * 0.26 * power;
+            sprite.vy += rnd(-impulse, impulse) - dy * 0.26 * power;
+
+            // Чуть-чуть живого поворота, но не раскрутка.
+            sprite.vr += rnd(-0.08, 0.08) * power;
+            sprite.vr = clamp(sprite.vr, -maxSpin, maxSpin);
           }
 
           setStatus(`SHAKE ${jerk.toFixed(1)} / GRAV ${gravity.toFixed(2)}`);
@@ -592,8 +602,8 @@
             const aLocked = a.dragging;
             const bLocked = b.dragging;
 
-            // Мягкое разделение, без резкого выстреливания.
-            const separationSoftness = 0.62;
+            // Мягкое разделение, чтобы не было резкой реакции.
+            const separationSoftness = 0.45;
 
             if (aLocked && !bLocked) {
               b.x += nx * overlap * separationSoftness;
@@ -631,14 +641,16 @@
             if (!aLocked) {
               a.vx -= impulseX * invMassA;
               a.vy -= impulseY * invMassA;
-              a.vr -= clamp(impulseX * 0.00055, -0.18, 0.18);
             }
 
             if (!bLocked) {
               b.vx += impulseX * invMassB;
               b.vy += impulseY * invMassB;
-              b.vr += clamp(impulseX * 0.00055, -0.18, 0.18);
             }
+
+            // Столкновения теперь гасят вращение, а не добавляют его.
+            a.vr *= 0.45;
+            b.vr *= 0.45;
 
             a.vx *= collisionDamping;
             a.vy *= collisionDamping;
@@ -662,26 +674,26 @@
         if (sprite.x < 0) {
           sprite.x = 0;
           sprite.vx = Math.abs(sprite.vx) * wallRestitutionX;
-          sprite.vr += clamp(sprite.vx * 0.003, -0.08, 0.08);
+          sprite.vr *= 0.25;
         } else if (sprite.x > maxX) {
           sprite.x = maxX;
           sprite.vx = -Math.abs(sprite.vx) * wallRestitutionX;
-          sprite.vr += clamp(sprite.vx * 0.003, -0.08, 0.08);
+          sprite.vr *= 0.25;
         }
 
         if (sprite.y < 0) {
           sprite.y = 0;
           sprite.vy = Math.abs(sprite.vy) * wallRestitutionY;
-          sprite.vr += clamp(sprite.vy * 0.002, -0.06, 0.06);
+          sprite.vr *= 0.25;
         } else if (sprite.y > maxY) {
           sprite.y = maxY;
           sprite.vy = -Math.abs(sprite.vy) * wallRestitutionY;
 
-          if (Math.abs(sprite.vy) < gravity * 3.0 + 0.65) {
+          if (Math.abs(sprite.vy) < gravity * 3.4 + 0.8) {
             sprite.vy = 0;
           }
 
-          sprite.vr *= 0.70;
+          sprite.vr = 0;
         }
       }
 
@@ -697,16 +709,17 @@
 
           sprite.vx *= airDamping;
           sprite.vy *= airDamping;
-          sprite.vr *= rotationDamping;
+
+          // Очень сильное затухание вращения + жёсткий лимит.
+          sprite.vr = clamp(sprite.vr * rotationDamping, -maxSpin, maxSpin);
 
           bounceFromWalls(sprite);
 
-          if (Math.abs(sprite.vx) < 0.025) sprite.vx = 0;
-          if (Math.abs(sprite.vy) < 0.025) sprite.vy = 0;
-          if (Math.abs(sprite.vr) < 0.01) sprite.vr = 0;
+          if (Math.abs(sprite.vx) < 0.035) sprite.vx = 0;
+          if (Math.abs(sprite.vy) < 0.035) sprite.vy = 0;
+          if (Math.abs(sprite.vr) < 0.018) sprite.vr = 0;
         }
 
-        // Одна итерация делает физику менее "нервной", чем в v3.
         collideSprites();
 
         for (const sprite of sprites) {
@@ -720,10 +733,10 @@
         for (const sprite of sprites) {
           sprite.x = rnd(24, Math.max(25, window.innerWidth - 180));
           sprite.y = rnd(120, Math.max(121, window.innerHeight - 230));
-          sprite.vx = rnd(-0.55, 0.55);
-          sprite.vy = rnd(-0.55, 0.55);
-          sprite.rot = rnd(-4, 4);
-          sprite.vr = rnd(-0.035, 0.035);
+          sprite.vx = rnd(-0.45, 0.45);
+          sprite.vy = rnd(-0.45, 0.45);
+          sprite.rot = rnd(-2, 2);
+          sprite.vr = 0;
 
           fitInside(sprite);
           renderSprite(sprite);
@@ -734,7 +747,7 @@
 
       deleteButton.addEventListener("click", () => {
         if (!selected) {
-          setStatus("SELECT PNG FIRST");
+          setStatus("SELECT FILE FIRST");
           return;
         }
 
@@ -767,9 +780,10 @@
         for (const sprite of sprites) {
           if (sprite.dragging) continue;
 
-          sprite.vx += rnd(-7, 7) * power;
-          sprite.vy += rnd(-7, 7) * power;
-          sprite.vr += rnd(-0.45, 0.45) * power;
+          sprite.vx += rnd(-6, 6) * power;
+          sprite.vy += rnd(-6, 6) * power;
+          sprite.vr += rnd(-0.08, 0.08) * power;
+          sprite.vr = clamp(sprite.vr, -maxSpin, maxSpin);
         }
 
         setStatus("SPACE SHAKE");
